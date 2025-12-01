@@ -68,6 +68,7 @@ ggsave(filename = "mpg-plot.png", plot = my_bar_plot)
 getwd()
 
 library(nycflights13)
+aS
 
 View(flights)
 
