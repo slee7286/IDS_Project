@@ -47,3 +47,50 @@ growth_rate %>%
     axis.line = element_line(colour = "darkblue", size = 1),
     legend.title = element_text(face = "bold")
   )
+
+combined_1 <- combined %>%
+  filter(Continent == "Asia" | Continent == "Oceania" | Continent == "Africa")
+
+combined_2 <- combined %>%
+  filter(Continent == "Europe" | Continent == "North America" | Continent == "South America")
+
+
+combined_1 %>%
+  ggplot(aes(
+    x = Year,
+    y = `GDP Growth Rate`,
+    color = Continent)) +
+  geom_smooth(method = "gam", formula = y ~ s(x, k = 10), aes(fill = Continent), alpha = 0.15) +
+  labs(
+    x = "Year",
+    y = "GDP Growth Rate (%)",
+    title = "GDP Growth Rate by Year (Part 1)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 8),
+    axis.line = element_line(colour = "darkblue", size = 1),
+    legend.title = element_text(face = "bold")
+  )
+
+combined_2 %>%
+  ggplot(aes(
+    x = Year,
+    y = `GDP Growth Rate`,
+    color = Continent)) +
+  geom_smooth(method = "gam", formula = y ~ s(x, k = 10), aes(fill = Continent), alpha = 0.15) +
+  labs(
+    x = "Year",
+    y = "GDP Growth Rate (%)",
+    title = "GDP Growth Rate by Year (Part 2)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 8),
+    axis.line = element_line(colour = "darkblue", size = 1),
+    legend.title = element_text(face = "bold")
+  )
