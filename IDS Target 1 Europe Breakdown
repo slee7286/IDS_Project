@@ -26,11 +26,11 @@ combined <- combined %>%
 # ============================================================================
 
 
-# Filter for Europe only and filter for 2000-2020 
+# Filter for Europe only and filter for 1990-2020 
 europe_data <- combined %>%
-  filter(Continent == "Europe" & Year >= 2000 & Year <= 2020)
+  filter(Continent == "Europe" & Year >= 1990 & Year <= 2020)
 
-# Calculate average GDP per capita for each country using average across 2000-2020 period
+# Calculate average GDP per capita for each country using average across 1990-2020 period
 europe_avg_gdp <- europe_data %>%
   group_by(Entity, Code) %>%
   summarize(`Avg GDP per capita` = mean(`GDP per capita`, na.rm = TRUE), .groups = "drop")
@@ -216,7 +216,7 @@ threshold_analysis_avg <- europe_data %>%
     `Percentage` = sum(`Avg Growth Rate` >= 7, na.rm = TRUE) / n() * 100
   )
 
-print("\nAlternative: Countries with Average Growth Rate ≥7% (2000-2020):")
+print("\nAlternative: Countries with Average Growth Rate ≥7% (1990-2020):")
 print(threshold_analysis_avg)
 
 # Analysis for More Developed Countries: Sustained positive growth
@@ -263,3 +263,4 @@ comparison_summary$`Percentage (%)` <- round(comparison_summary$`Countries Meeti
 
 print("\nComparison: Countries Meeting Their Respective UN Targets:")
 print(comparison_summary)
+
