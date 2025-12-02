@@ -1,0 +1,265 @@
+# ============================================================================
+# EUROPE BREAKDOWN
+# ============================================================================
+
+library(tidyverse)
+library(ggplot2)
+
+csv1 <- read.csv(file = "continents-according-to-our-world-in-data.csv",
+                 sep = ",")
+csv2 <- read.csv(file = "gdp-per-capita-worldbank.csv",
+                 sep = ",")
+
+csv1 <- csv1 %>% mutate(Year = NULL,
+                        Entity = NULL)
+combined <- csv2 %>% left_join(csv1, join_by(Code))
+combined <- combined %>% rename("GDP per capita" = "GDP.per.capita..PPP..constant.2017.international...")
+
+# Calculate GDP Growth Rate
+combined <- combined %>%
+  group_by(Code) %>%
+  mutate(`GDP Growth Rate` = ((`GDP per capita` - lag(`GDP per capita`)) / lag(`GDP per capita`)) * 100) %>%
+  ungroup()
+
+# ============================================================================
+# ANALYSIS: DIVIDE EUROPE BY DEVELOPMENT LEVEL
+# ============================================================================
+
+
+# Filter for Europe only and filter for 2000-2020 
+europe_data <- combined %>%
+  filter(Continent == "Europe" & Year >= 2000 & Year <= 2020)
+
+# Calculate average GDP per capita for each country using average across 2000-2020 period
+europe_avg_gdp <- europe_data %>%
+  group_by(Entity, Code) %>%
+  summarize(`Avg GDP per capita` = mean(`GDP per capita`, na.rm = TRUE), .groups = "drop")
+
+# Classify countries as "More Developed" or "Less Developed" using median GDP per capita
+median_gdp <- median(europe_avg_gdp$`Avg GDP per capita`, na.rm = TRUE)
+
+europe_classification <- europe_avg_gdp %>%
+  mutate(`Development Level` = ifelse(`Avg GDP per capita` >= median_gdp, 
+                                       "More Developed", 
+                                       "Less Developed"))
+
+europe_data <- europe_data %>%
+  left_join(europe_classification %>% select(Code, `Development Level`), by = "Code")
+
+europe_data <- europe_data %>%
+  filter(!is.na(`Development Level`))
+
+# ============================================================================
+# GRAPH 1: GDP Growth Rate Over Time by Development Level
+# ============================================================================
+
+plot1 <- europe_data %>%
+  ggplot(aes(x = Year, 
+             y = `GDP Growth Rate`, 
+             color = `Development Level`)) +
+  geom_smooth(method = "loess", 
+              aes(fill = `Development Level`), 
+              alpha = 0.2,
+              size = 1.2) +
+  geom_hline(yintercept = 7, 
+             linetype = "dashed", 
+             color = "red", 
+             size = 0.8) +
+  annotate("text", 
+           x = min(europe_data$Year, na.rm = TRUE) + 2, 
+           y = 7.5, 
+           label = "UN Target: 7% for LDCs", 
+           color = "red", 
+           size = 3) +
+  labs(
+    title = "GDP Growth Rate in Europe: More vs. Less Developed Countries",
+    x = "Year",
+    y = "GDP Growth Rate (%)",
+    color = "Development Level",
+    fill = "Development Level"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 10),
+    legend.title = element_text(face = "bold"),
+    legend.position = "bottom"
+  )
+
+print(plot1)
+
+# ============================================================================
+# GRAPH 2: Box Plot Comparing Distribution of Growth Rates
+# ============================================================================
+
+plot2 <- europe_data %>%
+  filter(`GDP Growth Rate` >= -20 & `GDP Growth Rate` <= 20) %>%  # Remove extreme outliers
+  ggplot(aes(x = `Development Level`, 
+             y = `GDP Growth Rate`, 
+             fill = `Development Level`)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_hline(yintercept = 7, 
+             linetype = "dashed", 
+             color = "red", 
+             size = 0.8) +
+  labs(
+    title = "Distribution of GDP Growth Rates in Europe by Development Level",
+    x = "Development Level",
+    y = "GDP Growth Rate (%)",
+    fill = "Development Level"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 10),
+    legend.position = "none"
+  )
+
+print(plot2)
+
+# ============================================================================
+# GRAPH 3: Individual Country Comparison (Top/Bottom 5)
+# ============================================================================
+
+# Top 5 more developed and bottom 5 less developed countries by average GDP
+top_developed <- europe_classification %>%
+  filter(`Development Level` == "More Developed") %>%
+  arrange(desc(`Avg GDP per capita`)) %>%
+  head(5)
+
+bottom_developed <- europe_classification %>%
+  filter(`Development Level` == "Less Developed") %>%
+  arrange(`Avg GDP per capita`) %>%
+  head(5)
+
+selected_countries <- bind_rows(top_developed, bottom_developed)
+
+plot3 <- europe_data %>%
+  filter(Code %in% selected_countries$Code) %>%
+  ggplot(aes(x = Year, 
+             y = `GDP Growth Rate`, 
+             color = Entity, 
+             linetype = `Development Level`)) +
+  geom_line(size = 0.8) +
+  geom_hline(yintercept = 7, 
+             linetype = "dashed", 
+             color = "red", 
+             size = 0.8) +
+  labs(
+    title = "GDP Growth Trajectories",
+    subtitle = "Top 5 More Developed vs. Bottom 5 Less Developed",
+    x = "Year",
+    y = "GDP Growth Rate (%)",
+    color = "Country",
+    linetype = "Development Level"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 9),
+    axis.text = element_text(size = 9),
+    axis.title = element_text(size = 10),
+    legend.title = element_text(face = "bold", size = 9),
+    legend.text = element_text(size = 8)
+  )
+
+print(plot3)
+
+# ============================================================================
+# STATISTICS FOR ANALYSIS
+# ============================================================================
+
+summary_stats <- europe_data %>%
+  group_by(`Development Level`) %>%
+  summarize(
+    `Mean Growth Rate (%)` = mean(`GDP Growth Rate`, na.rm = TRUE),
+    `Median Growth Rate (%)` = median(`GDP Growth Rate`, na.rm = TRUE),
+    `SD Growth Rate` = sd(`GDP Growth Rate`, na.rm = TRUE),
+    `% Years Above 7%` = sum(`GDP Growth Rate` >= 7, na.rm = TRUE) / n() * 100,
+    `Number of Countries` = n_distinct(Code)
+  )
+
+print("Summary Statistics by Development Level:")
+print(summary_stats)
+
+# Calculate percentage of countries meeting 7% threshold
+threshold_analysis <- europe_data %>%
+  group_by(`Development Level`, Code, Entity) %>%
+  summarize(
+    `Avg Growth Rate` = mean(`GDP Growth Rate`, na.rm = TRUE),
+    `% Years >= 7%` = sum(`GDP Growth Rate` >= 7, na.rm = TRUE) / n() * 100,
+    .groups = "drop"
+  ) %>%
+  group_by(`Development Level`) %>%
+  summarize(
+    `Countries Meeting 7% (>50% of years)` = sum(`% Years >= 7%` > 50),
+    `Total Countries` = n(),
+    `Percentage` = sum(`% Years >= 7%` > 50) / n() * 100
+  )
+
+print("\nCountries Meeting UN Target (7% growth in >50% of years):")
+print(threshold_analysis)
+
+# Further analysis: Countries with average growth ≥7%
+threshold_analysis_avg <- europe_data %>%
+  group_by(`Development Level`, Code, Entity) %>%
+  summarize(
+    `Avg Growth Rate` = mean(`GDP Growth Rate`, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  group_by(`Development Level`) %>%
+  summarize(
+    `Countries with Avg Growth ≥7%` = sum(`Avg Growth Rate` >= 7, na.rm = TRUE),
+    `Total Countries` = n(),
+    `Percentage` = sum(`Avg Growth Rate` >= 7, na.rm = TRUE) / n() * 100
+  )
+
+print("\nAlternative: Countries with Average Growth Rate ≥7% (2000-2020):")
+print(threshold_analysis_avg)
+
+# Analysis for More Developed Countries: Sustained positive growth
+developed_sustainability <- europe_data %>%
+  filter(`Development Level` == "More Developed") %>%
+  group_by(Code, Entity) %>%
+  summarize(
+    `Avg Growth Rate` = mean(`GDP Growth Rate`, na.rm = TRUE),
+    `% Years with Positive Growth` = sum(`GDP Growth Rate` > 0, na.rm = TRUE) / n() * 100,
+    `Number of Negative Years` = sum(`GDP Growth Rate` < 0, na.rm = TRUE),
+    `Total Years` = n(),
+    .groups = "drop"
+  )
+
+# Summary for more developed countries
+developed_summary <- developed_sustainability %>%
+  summarize(
+    `Countries with Positive Avg Growth` = sum(`Avg Growth Rate` > 0, na.rm = TRUE),
+    `Countries with >80% Positive Years` = sum(`% Years with Positive Growth` >= 80, na.rm = TRUE),
+    `Total Countries` = n(),
+    `Mean Avg Growth Rate` = mean(`Avg Growth Rate`, na.rm = TRUE),
+    `% Meeting Sustainability (>80% positive years)` = sum(`% Years with Positive Growth` >= 80, na.rm = TRUE) / n() * 100
+  )
+
+print("\nMore Developed Countries: Sustained Positive Growth Analysis:")
+print(developed_summary)
+
+# Compare Less Developed vs More Developed on their respective targets
+comparison_summary <- data.frame(
+  `Development Level` = c("Less Developed", "More Developed"),
+  `Target` = c("≥7% annual growth", "Sustained positive growth"),
+  `Countries Meeting Target` = c(
+    threshold_analysis %>% filter(`Development Level` == "Less Developed") %>% pull(`Countries Meeting 7% (>50% of years)`),
+    developed_summary %>% pull(`Countries with >80% Positive Years`)
+  ),
+  `Total Countries` = c(
+    threshold_analysis %>% filter(`Development Level` == "Less Developed") %>% pull(`Total Countries`),
+    developed_summary %>% pull(`Total Countries`)
+  ),
+  check.names = FALSE
+)
+
+comparison_summary$`Percentage (%)` <- round(comparison_summary$`Countries Meeting Target` / comparison_summary$`Total Countries` * 100, 1)
+
+print("\nComparison: Countries Meeting Their Respective UN Targets:")
+print(comparison_summary)
