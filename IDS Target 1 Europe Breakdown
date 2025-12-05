@@ -119,53 +119,6 @@ plot2 <- europe_data %>%
 
 print(plot2)
 
-# ============================================================================
-# GRAPH 3: Individual Country Comparison (Top/Bottom 5)
-# ============================================================================
-
-# Top 5 more developed and bottom 5 less developed countries by average GDP
-top_developed <- europe_classification %>%
-  filter(`Development Level` == "More Developed") %>%
-  arrange(desc(`Avg GDP per capita`)) %>%
-  head(5)
-
-bottom_developed <- europe_classification %>%
-  filter(`Development Level` == "Less Developed") %>%
-  arrange(`Avg GDP per capita`) %>%
-  head(5)
-
-selected_countries <- bind_rows(top_developed, bottom_developed)
-
-plot3 <- europe_data %>%
-  filter(Code %in% selected_countries$Code) %>%
-  ggplot(aes(x = Year, 
-             y = `GDP Growth Rate`, 
-             color = Entity, 
-             linetype = `Development Level`)) +
-  geom_line(size = 0.8) +
-  geom_hline(yintercept = 7, 
-             linetype = "dashed", 
-             color = "red", 
-             size = 0.8) +
-  labs(
-    title = "GDP Growth Trajectories",
-    subtitle = "Top 5 More Developed vs. Bottom 5 Less Developed",
-    x = "Year",
-    y = "GDP Growth Rate (%)",
-    color = "Country",
-    linetype = "Development Level"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
-    plot.subtitle = element_text(hjust = 0.5, size = 9),
-    axis.text = element_text(size = 9),
-    axis.title = element_text(size = 10),
-    legend.title = element_text(face = "bold", size = 9),
-    legend.text = element_text(size = 8)
-  )
-
-print(plot3)
 
 # ============================================================================
 # STATISTICS FOR ANALYSIS
