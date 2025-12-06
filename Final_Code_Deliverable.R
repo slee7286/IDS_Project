@@ -24,19 +24,19 @@ csv1 <- csv1 %>% mutate(Year = NULL,
 
 ### Primary key is the unique country code, given by column 'Code'
 ### Left join adds the column 'Continent' to csv2 and csv3, which we store in another variable
-combined_gdp <- csv2 %>% left_join(csv1, join_by(Code))
-combined_youth <- csv3 %>% left_join(csv1, join_by(Code))
+gdp <- csv2 %>% left_join(csv1, join_by(Code))
+youth <- csv3 %>% left_join(csv1, join_by(Code))
 
 ### Rename long column names to be more simple
-combined_gdp <- combined_gdp %>% rename("GDP per capita" = "GDP.per.capita..PPP..constant.2017.international...")
-combined_youth <- combined_youth %>% rename("Youth NEET" = "Share.of.youth.not.in.education..employment.or.training..total....of.youth.population.")
+gdp <- gdp %>% rename("GDP per capita" = "GDP.per.capita..PPP..constant.2017.international...")
+youth <- youth %>% rename("Youth NEET" = "Share.of.youth.not.in.education..employment.or.training..total....of.youth.population.")
 
 ### Calculate GDP growth rate based on GDP per capita data
-combined_gdp <- combined_gdp %>%
+gdp <- gdp %>%
   mutate(`GDP Growth Rate` = ((`GDP per capita` - lag(`GDP per capita`)) / lag(`GDP per capita`)) * 100)
 
 ### Create new data frame containing mean GDP growth rate for every continent
-growth_rate <- combined %>%
+growth_rate <- gdp %>%
   group_by(Code) %>%
   summarize("Mean GDP Growth Rate" = mean(`GDP Growth Rate`, na.rm = TRUE)) %>%
   right_join(csv1) %>%
