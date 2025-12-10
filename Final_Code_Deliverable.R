@@ -17,6 +17,7 @@ setwd('C:/Users/slee7/OneDrive - Imperial College London/Introduction to Data Sc
 # - csv1: continent classification 
 # - csv2: GDP per capita (PPP 2017 USD $)
 # - csv3: youth NEET share (% of youth 15-24)
+# - csv4: LDC classification, ease of doing business index, HDI
 csv1 <- read.csv(file = "continents-according-to-our-world-in-data.csv",
                  sep = ",")
 
@@ -25,6 +26,9 @@ csv2 <- read.csv(file = "gdp-per-capita-worldbank.csv",
 
 
 csv3 <- read.csv(file = "youth-not-in-education-employment-training.csv",
+                 sep = ",")
+
+csv4 <- read.csv(file = "Group K12 Custom Data.csv",
                  sep = ",")
 
 
@@ -46,7 +50,7 @@ youth <- youth %>% rename("Youth NEET Share" = "Share.of.youth.not.in.education.
 
 # 2) Data wrangling for GDP per capita and GDP growth rates 
 
-### [Section 4 Data Wrangling] Entities classified into Continents and graphed by average GDP growth rate
+### [Section 5 Data Wrangling] Entities classified into Continents and graphed by average GDP growth rate
 ### For each country (Code), compute the year-on-year GDP growth rate based on GDP per capita
 # - This approximates the SDG Target 8.1 (sustained growth)
 gdp <- gdp %>%
@@ -61,7 +65,7 @@ growth_rate_country <- gdp %>%
   left_join(csv1) %>%
   na.omit() # omitting any N/A values 
 
-### [Section 5 Data Wrangling] Europe categorically classified by GDP and graphed by GDP growth rate
+### [Section 6 Data Wrangling] Europe categorically classified by GDP and graphed by GDP growth rate
 ### Filter European countries and restrict to 1990-2020, this period aligns with the availability of higher-quality data and the SDG focus
 europe_data <- gdp %>%
   filter(Continent == "Europe",
@@ -100,7 +104,7 @@ growth_rate_per_year <- gdp %>%
 
 # 3) Data wrangling for share of youth NEET
 
-### [Section 7 Data Wrangling]
+### [Section 8 Data Wrangling]
 # - Average NEET by continent and year (unweighted across countries)
 # - We filter to Year <= 2020 to match the SDG 8.6 target horizon
 youth_sum <- youth %>%
@@ -111,7 +115,7 @@ youth_sum <- youth %>%
     .groups = "drop"
   )
 
-### [Section 8 Data Wrangling] Bottom 5 and top 5 European countries by recent GDP and graphed by youth NEET share
+### [Section 9 Data Wrangling] Bottom 5 and top 5 European countries by recent GDP and graphed by youth NEET share
 # - We filter to Year <= 2020 to match the SDG 8.6 target horizon
 youth <- youth %>%
   group_by(Continent, Year) %>%
@@ -141,7 +145,26 @@ bot5top5 <- youth %>%
                      `GDP Growth Rate` = NULL), join_by(Code)) %>%
   na.omit() # omitting any N/A values
 
-# 4) Graph: Average GDP Per Capita across individual continents
+# 4) Data wrangling for custom K12 CSV
+
+### [Section 10 Data Wrangling]
+### Filter only LDC countries
+### Delete year column that only has 2015
+ldc <- csv4 %>%
+  mutate(Year = NULL) %>%
+  filter(LDC.Classification == TRUE) %>%
+  left_join(gdp, join_by(Code))
+
+### For each year, calculate the mean GDP growth rate for all LDC countries
+# - This is used as a proxy for development level. 
+ldc_avg_growth <- ldc %>%
+  group_by(Year, Continent.x) %>%
+  summarise("Avg GDP Per Capita" = mean(`GDP Growth Rate`, na.rm = TRUE),
+            .groups = "drop") %>%
+  na.omit()
+
+
+# 5) Graph: Average GDP per capita across individual continents
 
 # - Remove outliers from visual (still used in calculating median and quartiles)
 # - Stat summary adds labels of median, Q1, and Q3
@@ -179,7 +202,7 @@ growth_rate_country %>%
     legend.title = element_text(face = "bold")
   ) 
 
-# 5a) Graph: Europe GDP growth over time by average GDP
+# 6a) Graph: Europe GDP growth over time by average GDP
 
 # - Smoothed graph paths for high vs low GDP European countries.
 # - The dashed red line at 7% marks the UN target for LDCs in SDG 8.1.
@@ -204,7 +227,7 @@ europe_data %>%
     legend.position = "bottom"
   )
 
-# 5b) Graph: Distribution of GDP growth in Europe by development level 
+# 6b) Graph: Distribution of GDP growth in Europe by development level 
 # - Boxplot visually removes extreme outliers to focus on the bulk of the distribution.
 # - Compares typical growth volatility for more vs less developed countries. 
 
@@ -241,7 +264,7 @@ europe_data %>%
     legend.position = "none"
   )
 
-# 6) Graph: Average GDP per capita growth by continent (1990-)
+# 7) Graph: Average GDP per capita growth by continent (1990-)
 
 ### Graphs mean GDP growth rate of each continent by year
 # - Geom_hline creates dashed line, showing 7% LDC growth rate target
@@ -259,7 +282,7 @@ ggplot(growth_rate_per_year,
   ) +
   theme_minimal()
 
-# 7) Graphs for share of youth NEET across all the continents over time 
+# 8) Graphs for share of youth NEET across all the continents over time 
 
 ### Line plot: evolution of average NEET share across continents over time
 # - Line plot chosen to clearly see trends over years
@@ -316,7 +339,7 @@ neet_change_summary <- earliest_neet %>%
   select(Continent, absolute_change, percent_change, neet_earliest)
 
 
-# 8) NEET in Europe: Top 5 vs Bottom 5 by GDP per capita 
+# 9) NEET in Europe: Top 5 vs Bottom 5 by GDP per capita 
 
 ### Create line plot of NEET 
 ### Remove outliers from visual (still used in calculating median and quartiles)
@@ -329,6 +352,28 @@ bot5top5 %>% ggplot(aes(x = Year, y = `Youth NEET Share`, color = Entity, linety
     x = "Year",
     y = "Youth NEET Share (%)",
     color = "Country"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0, size = 10, face = "bold"),
+    legend.position = "right",
+    legend.margin = margin(0,0,0,0),
+    legend.title = element_text(size = 10, face = "italic"),
+    legend.text  = element_text(size = 8)
+  )
+
+# 10) Least Developed Countries Target Comparison
+ldc_avg_growth %>% ggplot(aes(x = Year, y = `Avg GDP Per Capita`, color = Continent.x, group = Continent.x)) +
+  geom_line(size = 1.4, alpha = 0.95) +
+  geom_hline(yintercept = 7,
+             linetype = "dashed",
+             color = "red",
+             size = 0.8) +
+  labs(
+    title = "GDP Growth Rate Over Time: Least Developed Countries by Continent",
+    x = "Year",
+    y = "Mean GDP Growth Rate (%)",
+    color = "Continent"
   ) +
   theme_minimal() +
   theme(
