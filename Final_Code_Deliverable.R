@@ -92,8 +92,6 @@ europe_data <- europe_data %>%
             by = "Code") %>%
   filter(!is.na(`GDP Classification`))
 
-### [Section 6 Data Wrangling] 
-
 ### For each continent, compute the mean GDP growth rate for each year into a new data frame
 growth_rate_per_year <- gdp %>%
   group_by(Continent, Year) %>%
@@ -103,8 +101,22 @@ growth_rate_per_year <- gdp %>%
 # 3) Data wrangling for share of youth NEET
 
 ### [Section 7 Data Wrangling]
+# - Average NEET by continent and year (unweighted across countries)
+# - We filter to Year <= 2020 to match the SDG 8.6 target horizon
+youth_sum <- youth %>%
+  group_by(Continent, Year) %>%
+  filter(!is.na(Continent), Year <= 2020) %>%
+  summarise(
+    mean_neet = mean(`Youth NEET Share`, na.rm = TRUE),
+    .groups = "drop"
+  )
 
 ### [Section 8 Data Wrangling] Bottom 5 and top 5 European countries by recent GDP and graphed by youth NEET share
+# - We filter to Year <= 2020 to match the SDG 8.6 target horizon
+youth <- youth %>%
+  group_by(Continent, Year) %>%
+  filter(!is.na(Continent), Year <= 2020)
+
 ### Exclude San Marino due to lack of GDP data in 2021
 ### Exclude Ukraine due to lack of Youth NEET data
 bot5top5_recent <- gdp %>%
@@ -179,7 +191,7 @@ europe_data %>%
   labs(
     title = "GDP Growth Rate Over Time in Europe: High vs. Low GDP",
     x = "Year",
-    y = "GDP Growth Rate (%)",
+    y = "Mean GDP Growth Rate (%)",
     color = "GDP Classification",
     fill  = "GDP Classification"
   ) +
@@ -208,7 +220,7 @@ europe_data %>%
   labs(
     title = "Distribution of GDP Growth Rates in Europe by GDP Classification",
     x = "GDP Classification",
-    y = "GDP Growth Rate (%)",
+    y = "Mean GDP Growth Rate (%)",
     fill = "GDP Classification"
   ) +
   stat_summary(fun.data = function(x) data.frame(y=median(x), label=paste("Median:",round(median(x),1))),
@@ -249,18 +261,10 @@ ggplot(growth_rate_per_year,
 
 # 7) Graphs for share of youth NEET across all the continents over time 
 
-# - Average NEET by continent and year (unweighted across countries)
-# - We filter to Year <= 2020 to match the SDG 8.6 target horizon. 
-youth <- youth %>%
-  group_by(Continent, Year) %>%
-  filter(!is.na(Continent), Year <= 2020) %>%
-  summarise(
-    mean_neet = mean(`Youth NEET Share`, na.rm = TRUE),
-    .groups = "drop"
-  )
+### Line plot: evolution of average NEET share across continents over time
+# - Line plot chosen to clearly see trends over years
 
-# Line plot: evolution of average NEET share across continents over time.
-ggplot(youth, 
+ggplot(youth_sum, 
        aes(x = Year, y = mean_neet, colour = Continent)) +
   geom_line() +
   geom_point() +
@@ -268,9 +272,10 @@ ggplot(youth,
     title = "Share of Youth Not in Employment, Education or Training (NEET)",
     subtitle = "Average across countries within each continent",
     x = "Year",
-    y = "Mean NEET (% of youth population)",
+    y = "Mean Youth NEET Share (%)",
     colour = "Continent"
   ) +
+  theme_minimal() +
   theme(
     plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
     plot.subtitle = element_text(hjust = 0.5, size = 10, face = "italic"),
@@ -279,11 +284,11 @@ ggplot(youth,
 
 ### Summarise change up to 2020 by continent
 ### For each continent, we:
-# - Find the earliest year with data, 
-# - Find 2020 (or the latest year <= 2020 if 2020 is missing),
+# - Find the earliest year with data
+# - Find 2020 (or the latest year <= 2020 if 2020 is missing)
 # - Compute absolute and percentage change 
 
-earliest_neet <- youth %>%
+earliest_neet <- youth_sum %>%
   group_by(Continent) %>%
   slice_min(Year, n = 1, with_ties = FALSE) %>%
   rename(
@@ -292,7 +297,7 @@ earliest_neet <- youth %>%
   ) %>%
   ungroup()
 
-latest_neet <- youth %>%
+latest_neet <- youth_sum %>%
   group_by(Continent) %>%
   slice_max(Year, n = 1, with_ties = FALSE) %>%
   rename(
