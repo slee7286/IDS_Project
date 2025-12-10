@@ -7,6 +7,7 @@ library(tidyverse)
 library(ggplot2)
 library(ggthemes)
 library(ggrepel)
+library(ggpubr)
 
 # 1b) Setup: Load and clean core datasets
 
@@ -51,17 +52,17 @@ youth <- youth %>% rename("Youth NEET Share" = "Share.of.youth.not.in.education.
 # 2) Data wrangling for GDP per capita and GDP growth rates 
 
 ### [Section 5 Data Wrangling] Entities classified into Continents and graphed by average GDP growth rate
-### For each country (Code), compute the year-on-year GDP growth rate based on GDP per capita
+### For each country (Code), compute the year-on-year GDP per capita growth rate based on GDP per capita
 # - This approximates the SDG Target 8.1 (sustained growth)
 gdp <- gdp %>%
   group_by(Code) %>%
-  mutate(`GDP Growth Rate` = ((`GDP Per Capita` - lag(`GDP Per Capita`)) / lag(`GDP Per Capita`)) * 100) # calculates growth rate
+  mutate(`GDP Per Capita Growth Rate` = ((`GDP Per Capita` - lag(`GDP Per Capita`)) / lag(`GDP Per Capita`)) * 100) # calculates growth rate
 
 ### For each country (Code), compute the mean GDP growth rate across all years into a new data frame
 ### Then join continent info using left join so we can summarise and visualise by continent
 growth_rate_country <- gdp %>%
   group_by(Code) %>%
-  summarize("Mean GDP Growth Rate" = mean(`GDP Growth Rate`, na.rm = TRUE)) %>%
+  summarize("Mean GDP Per Capita Growth Rate" = mean(`GDP Per Capita Growth Rate`, na.rm = TRUE)) %>%
   left_join(csv1) %>%
   na.omit() # omitting any N/A values 
 
@@ -99,7 +100,7 @@ europe_data <- europe_data %>%
 ### For each continent, compute the mean GDP growth rate for each year into a new data frame
 growth_rate_per_year <- gdp %>%
   group_by(Continent, Year) %>%
-  summarize("Mean GDP Growth Rate" = mean(`GDP Growth Rate`, na.rm = TRUE), .groups = "drop") %>%
+  summarize("Mean GDP Per Capita Growth Rate" = mean(`GDP Per Capita Growth Rate`, na.rm = TRUE), .groups = "drop") %>%
   na.omit() # omitting any N/A values 
 
 # 3) Data wrangling for share of youth NEET
@@ -142,7 +143,7 @@ bot5top5 <- youth %>%
                      Year = NULL,
                      `GDP Per Capita` = NULL,
                      Continent= NULL,
-                     `GDP Growth Rate` = NULL), join_by(Code)) %>%
+                     `GDP Per Capita Growth Rate` = NULL), join_by(Code)) %>%
   na.omit() # omitting any N/A values
 
 # 4) Data wrangling for custom K12 CSV
@@ -159,10 +160,27 @@ ldc <- csv4 %>%
 # - This is used as a proxy for development level. 
 ldc_avg_growth <- ldc %>%
   group_by(Year, Continent.x) %>%
-  summarise("Avg GDP Per Capita" = mean(`GDP Growth Rate`, na.rm = TRUE),
+  summarise("Avg GDP Per Capita" = mean(`GDP Per Capita Growth Rate`, na.rm = TRUE),
             .groups = "drop") %>%
   na.omit()
 
+### [Section 11 Data Wrangling]
+
+### Left join adds ease of business index information necessary for graph
+growth_rate_country_eodb <- growth_rate_country %>%
+  left_join(csv4, join_by(Code))
+
+### [Section 12 Data Wrangling]
+
+### Get most recent youth NEET share for each country
+youth_recent <- youth %>%
+  group_by(Code) %>%
+  arrange(Year) %>%
+  summarise(`Most Recent Youth NEET Share` = last(`Youth NEET Share`))
+
+### Left join adds HDI index information necessary for graph
+youth_recent <- youth_recent %>%
+  left_join(csv4, join_by(Code))
 
 # 5) Graph: Average GDP per capita across individual continents
 
@@ -172,7 +190,7 @@ ldc_avg_growth <- ldc %>%
 growth_rate_country %>%
   ggplot(aes(
     x = Continent,
-    y = `Mean GDP Growth Rate`)) +
+    y = `Mean GDP Per Capita Growth Rate`)) +
   geom_boxplot(outliers = FALSE) +
   geom_hline(yintercept = 7,
              linetype = "dashed",
@@ -180,17 +198,17 @@ growth_rate_country %>%
              size = 0.8) +
   labs(
     x = "Continents",
-    y = "Mean GDP Growth Rate (%)",
-    title = "Mean GDP Growth Rate by Continent"
+    y = "Mean GDP Per Capita Growth Rate (%)",
+    title = "Mean GDP Per Capita Growth Rate by Continent"
   ) +
   stat_summary(fun.data = function(x) data.frame(y=median(x), label=paste("Median:",round(median(x),1))),
                geom = "text", vjust = -0.5, size = 2.5) +
   stat_summary(fun.data = ~ data.frame(quarts = quantile(.x, probs = .25)),
-               aes(y = stage(`Mean GDP Growth Rate`, after_stat = quarts),
+               aes(y = stage(`Mean GDP Per Capita Growth Rate`, after_stat = quarts),
                    label = paste("Q1:",round(after_stat(quarts), digits = 3))),
                geom = "label", vjust = 1.2, size = 2.5) +
   stat_summary(fun.data = ~ data.frame(quarts = quantile(.x, probs = .75)),
-               aes(y = stage(`Mean GDP Growth Rate`, after_stat = quarts),
+               aes(y = stage(`Mean GDP Per Capita Growth Rate`, after_stat = quarts),
                    label = paste("Q3:",round(after_stat(quarts), digits = 3))),
                geom = "label", vjust = -0.2, size = 2.5) +
   theme_minimal() +
@@ -207,14 +225,14 @@ growth_rate_country %>%
 # - Smoothed graph paths for high vs low GDP European countries.
 # - The dashed red line at 7% marks the UN target for LDCs in SDG 8.1.
 europe_data %>%
-  ggplot(aes(x = Year, y = `GDP Growth Rate`, color = `GDP Classification`)) +
+  ggplot(aes(x = Year, y = `GDP Per Capita Growth Rate`, color = `GDP Classification`)) +
   geom_smooth(method = "loess", aes(fill = `GDP Classification`), alpha = 0.2, size = 1.2) +
   geom_hline(yintercept = 7, linetype = "dashed", color = "red", size = 0.8) +
   annotate("text", x = min(europe_data$Year, na.rm = TRUE) + 2, y = 7.5, label = "UN Target: 7% for LDCs", color = "red", size = 3) +
   labs(
-    title = "GDP Growth Rate Over Time in Europe: High vs. Low GDP",
+    title = "GDP Per Capita Growth Rate Over Time in Europe: High vs. Low GDP",
     x = "Year",
-    y = "Mean GDP Growth Rate (%)",
+    y = "Mean GDP Per Capita Growth Rate (%)",
     color = "GDP Classification",
     fill  = "GDP Classification"
   ) +
@@ -233,7 +251,7 @@ europe_data %>%
 
 europe_data %>%
   ggplot(aes(x = `GDP Classification`,
-             y = `GDP Growth Rate`,
+             y = `GDP Per Capita Growth Rate`,
              fill = `GDP Classification`)) +
   geom_boxplot(outliers = FALSE, alpha = 0.7) +
   geom_hline(yintercept = 7,
@@ -241,24 +259,24 @@ europe_data %>%
              color = "red",
              size = 0.8) +
   labs(
-    title = "Distribution of GDP Growth Rates in Europe by GDP Classification",
+    title = "Distribution of GDP Per Capita Growth Rates in Europe by GDP Classification",
     x = "GDP Classification",
-    y = "Mean GDP Growth Rate (%)",
+    y = "Mean GDP Per Capita Growth Rate (%)",
     fill = "GDP Classification"
   ) +
   stat_summary(fun.data = function(x) data.frame(y=median(x), label=paste("Median:",round(median(x),1))),
                geom = "text", vjust = -0.5, size = 3) +
   stat_summary(fun.data = ~ data.frame(quarts = quantile(.x, probs = .25)),
-               aes(y = stage(`GDP Growth Rate`, after_stat = quarts),
+               aes(y = stage(`GDP Per Capita Growth Rate`, after_stat = quarts),
                    label = paste("Q1:",round(after_stat(quarts), digits = 3))),
                geom = "label", vjust = 1.2, size = 2.5) +
   stat_summary(fun.data = ~ data.frame(quarts = quantile(.x, probs = .75)),
-               aes(y = stage(`GDP Growth Rate`, after_stat = quarts),
+               aes(y = stage(`GDP Per Capita Growth Rate`, after_stat = quarts),
                    label = paste("Q3:",round(after_stat(quarts), digits = 3))),
                geom = "label", vjust = -0.2, size = 2.5) +
   theme_minimal() +
   theme(
-    plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+    plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
     axis.text  = element_text(size = 10),
     axis.title = element_text(size = 10),
     legend.position = "none"
@@ -270,15 +288,15 @@ europe_data %>%
 # - Geom_hline creates dashed line, showing 7% LDC growth rate target
 # - Facet_wrap groups the six separate continent graphs into one graph
 ggplot(growth_rate_per_year,
-       aes(x = Year, y = `Mean GDP Growth Rate`)) +
+       aes(x = Year, y = `Mean GDP Per Capita Growth Rate`)) +
   geom_hline(yintercept = 7, linetype = "dashed") +
   geom_line() +
   facet_wrap(~ Continent, scales = "free_y") +
   labs(
-    title = "Average GDP per capita growth by continent",
+    title = "Average GDP Per Capita Growth by Continent",
     subtitle = "Dashed line shows 7% LDC growth rate target",
     x = "Year",
-    y = "Mean GDP Growth Rate (%)"
+    y = "Mean GDP Per Capita Growth Rate (%)"
   ) +
   theme_minimal()
 
@@ -358,11 +376,16 @@ bot5top5 %>% ggplot(aes(x = Year, y = `Youth NEET Share`, color = Entity, linety
     plot.title = element_text(hjust = 0, size = 10, face = "bold"),
     legend.position = "right",
     legend.margin = margin(0,0,0,0),
-    legend.title = element_text(size = 10, face = "italic"),
+    legend.title = element_text(size = 10, face = "bold"),
     legend.text  = element_text(size = 8)
   )
 
 # 10) Least Developed Countries Target Comparison
+
+### Create line plot of GDP growth rate
+# - Geom_hline creates dashed line, showing 7% LDC growth rate target
+# - Color and legend shows continent
+
 ldc_avg_growth %>% ggplot(aes(x = Year, y = `Avg GDP Per Capita`, color = Continent.x, group = Continent.x)) +
   geom_line(size = 1.4, alpha = 0.95) +
   geom_hline(yintercept = 7,
@@ -370,9 +393,10 @@ ldc_avg_growth %>% ggplot(aes(x = Year, y = `Avg GDP Per Capita`, color = Contin
              color = "red",
              size = 0.8) +
   labs(
-    title = "GDP Growth Rate Over Time: Least Developed Countries by Continent",
+    title = "GDP Per Capita Growth Rate Over Time: Least Developed Countries by Continent",
+    subtitle = "Dashed line shows 7% LDC growth rate target",
     x = "Year",
-    y = "Mean GDP Growth Rate (%)",
+    y = "Mean GDP Per Capita Growth Rate (%)",
     color = "Continent"
   ) +
   theme_minimal() +
@@ -380,6 +404,62 @@ ldc_avg_growth %>% ggplot(aes(x = Year, y = `Avg GDP Per Capita`, color = Contin
     plot.title = element_text(hjust = 0, size = 10, face = "bold"),
     legend.position = "right",
     legend.margin = margin(0,0,0,0),
-    legend.title = element_text(size = 10, face = "italic"),
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.text  = element_text(size = 8)
+  )
+
+# 11) Ease of Doing Business and GDP Per Capita Growth Rate Graph
+
+### Scatterplot of GDP Per Capita Growth Rate and Ease of Doing Business
+# - geom_smooth adds linear regression line of best fit
+# - stat_cor adds p-value and Pearson correlation coefficient
+growth_rate_country_eodb %>% ggplot(aes(x = `Mean GDP Per Capita Growth Rate`, y = Ease.of.Doing.Business, color = Continent.x, group = Continent.x)) +
+  geom_point() +
+  geom_smooth(aes(x = `Mean GDP Per Capita Growth Rate`, y = Ease.of.Doing.Business), method = "lm", se = FALSE, inherit.aes = FALSE) +
+  labs(
+    title = "Mean GDP Per Capita Growth Rate vs. Ease of Doing Business Index",
+    x = "Mean GDP Per Capita Growth Rate (%)",
+    y = "Ease of Doing Business Index",
+    color = "Continent"
+  ) +
+  stat_cor(
+    aes(x = `Mean GDP Per Capita Growth Rate`, y = Ease.of.Doing.Business), method = "pearson", inherit.aes = FALSE,
+    label.x.npc = 0.55,
+    label.y.npc = 1.0
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0, size = 10, face = "bold"),
+    legend.position = "right",
+    legend.margin = margin(0,0,0,0),
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.text  = element_text(size = 8)
+  )
+
+# 12) HDI and Youth NEET Share Graph
+
+### Scatterplot of Youth NEET and HDI
+# - geom_smooth adds linear regression line of best fit
+# - stat_cor adds p-value and Pearson correlation coefficient
+youth_recent %>% ggplot(aes(x = `Most Recent Youth NEET Share`, y = HDI, color = Continent, group = Continent)) +
+  geom_point() +
+  geom_smooth(aes(x = `Most Recent Youth NEET Share`, y = HDI), method = "lm", se = FALSE, inherit.aes = FALSE) +
+  labs(
+    title = "Youth NEET Share vs. Human Development Index (HDI)",
+    x = "Most Recent Youth NEET Share (%)",
+    y = "Human Development Index",
+    color = "Continent"
+  ) +
+  stat_cor(
+    aes(x = `Most Recent Youth NEET Share`, y = HDI), method = "pearson", inherit.aes = FALSE,
+    label.x.npc = 0.35,
+    label.y.npc = 1.0
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0, size = 10, face = "bold"),
+    legend.position = "right",
+    legend.margin = margin(0,0,0,0),
+    legend.title = element_text(size = 10, face = "bold"),
     legend.text  = element_text(size = 8)
   )
